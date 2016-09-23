@@ -66,7 +66,36 @@ void GetLabelSlice(const Dtype *labels, int rows, int cols,
   for (int h = 0; h < label_slice.dim(0); ++h) {
     labels += label_slice.offset(1);
     for (int w = 0; w < label_slice.dim(1); ++w) {
-      slice_data[w] = labels[w * label_slice.stride(1)];
+      Dtype current = labels[w * label_slice.stride(1)];
+      Dtype right = 0;
+      Dtype left = 0;
+      Dtype bottom = 0;
+      Dtype top = 0;
+      if ((w + 1) < label_slice.dim(1)) {
+        right = labels[(w + 1) * label_slice.stride(1)];
+      }
+      if ((w - 1) >= 0) {
+        left = labels[(w - 1) * label_slice.stride(1)];
+      }
+      if ((h + 1) < label_slice.dim(0)) {
+        bottom = labels[cols * label_slice.stride(0) + w * label_slice.stride(1)];
+      }
+      if ((h - 1) >= 0) {
+        const Dtype* last_row = labels - cols * label_slice.stride(0);
+        top = last_row[w * label_slice.stride(1)];
+      }
+      if ((current != right && right != 0) ||
+          (current == 0 && left != 0) ||
+          (current != bottom && bottom != 0) ||
+          (current == 0 && top != 0)) {
+        slice_data[w] = 2;
+      } else {
+        if (current > 0) {
+          slice_data[w] = 1;
+        } else {
+          slice_data[w] = 0;
+        }
+      }
     }
     labels += cols * label_slice.stride(0) - label_slice.offset(1);
     slice_data += label_slice.dim(1);

@@ -202,7 +202,36 @@ cv::Mat SliceMatrix(const cv::Mat &image, const caffe::Slice &slice,
         if (input_col >= image.cols) {
           out_image.at<float>(r, c) = pad;
         } else {
-          out_image.at<float>(r, c) = image.at<float>(input_row, input_col);
+          float current = image.at<float>(input_row, input_col);
+          float right = 0;
+          float left = 0;
+          float bottom = 0;
+          float top = 0;
+          if (((c + 1) * stride[1] + offset[1]) < image.cols) {
+            right = image.at<float>(input_row, (c + 1) * stride[1] + offset[1]);
+          }
+          if ((c - 1) >= 0) {
+            left = image.at<float>(input_row, (c - 1) * stride[1] + offset[1]);
+          }
+          if (((r + 1) * stride[0] + offset[0]) < image.rows) {
+            bottom = image.at<float>((r + 1) * stride[0] + offset[0], input_col);
+          }
+          if ((r - 1) >= 0) {
+            top = image.at<float>((r - 1) * stride[0] + offset[0], input_col);
+          }
+          if ((current != right && right != 0) ||
+              (current == 0 && left != 0) ||
+              (current != bottom && bottom != 0) ||
+              (current == 0 && top != 0)) {
+             out_image.at<float>(r, c) = 2;
+          } else {
+            if (current > 0) {
+              out_image.at<float>(r, c) = 1;
+            } else {
+              out_image.at<float>(r, c) = 0;
+            }
+          }
+//          out_image.at<float>(r, c) = image.at<float>(input_row, input_col);
         }
       }
     }
