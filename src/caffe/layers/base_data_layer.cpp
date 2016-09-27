@@ -22,8 +22,15 @@ void BaseDataLayer<Dtype>::LayerSetUp(const vector<Blob<Dtype>*>& bottom,
       const vector<Blob<Dtype>*>& top) {
   if (top.size() == 1) {
     output_labels_ = false;
+    output_rois_ = false;
   } else {
-    output_labels_ = true;
+    if (top.size() == 2) {
+      output_labels_ = true;
+      output_rois_ = false;
+    } else {
+      output_labels_ = true;
+      output_rois_ = true;
+    }
   }
   data_transformer_.reset(
       new DataTransformer<Dtype>(transform_param_, this->phase_));
@@ -54,6 +61,9 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
     prefetch_[i].data_.mutable_cpu_data();
     if (this->output_labels_) {
       prefetch_[i].label_.mutable_cpu_data();
+      if (this->output_rois_) {
+        prefetch_[i].roi_.mutable_cpu_data();
+      }
     }
   }
 #ifndef CPU_ONLY
@@ -62,6 +72,9 @@ void BasePrefetchingDataLayer<Dtype>::LayerSetUp(
       prefetch_[i].data_.mutable_gpu_data();
       if (this->output_labels_) {
         prefetch_[i].label_.mutable_gpu_data();
+        if (this->output_rois_) {
+          prefetch_[i].roi_.mutable_gpu_data();
+        }
       }
     }
   }
@@ -119,6 +132,13 @@ void BasePrefetchingDataLayer<Dtype>::Forward_cpu(
     // Copy the labels.
     caffe_copy(batch->label_.count(), batch->label_.cpu_data(),
         top[1]->mutable_cpu_data());
+    if (this->output_rois_) {
+      // Reshape to loaded rois.
+      top[2]->ReshapeLike(batch->roi_);
+      // Copy the rois.
+      caffe_copy(batch->roi_.count(), batch->roi_.cpu_data(),
+                top[2]->mutable_cpu_data());
+    } 
   }
 
   prefetch_free_.push(batch);

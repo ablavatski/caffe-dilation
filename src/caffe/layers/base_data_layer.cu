@@ -19,6 +19,13 @@ void BasePrefetchingDataLayer<Dtype>::Forward_gpu(
     // Copy the labels.
     caffe_copy(batch->label_.count(), batch->label_.gpu_data(),
         top[1]->mutable_gpu_data());
+    if (this->output_rois_) {
+      // Reshape to loaded rois.
+      top[2]->ReshapeLike(batch->roi_);
+      // Copy the rois.
+      caffe_copy(batch->roi_.count(), batch->roi_.gpu_data(),
+                top[2]->mutable_gpu_data());
+    }
   }
   // Ensure the copy is synchronous wrt the host, so that the next batch isn't
   // copied in meanwhile.

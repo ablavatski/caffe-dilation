@@ -364,6 +364,7 @@ message LayerParameter {
   optional BatchNormParameter batch_norm_param = 139;
   optional BiasParameter bias_param = 141;
   optional BinLabelDataParameter bin_label_data_param = 1001;
+  optional BinROILabelDataParameter bin_roi_label_data_param = 1010;
   optional ConcatParameter concat_param = 104;
   optional ContrastiveLossParameter contrastive_loss_param = 105;
   optional ConvolutionParameter convolution_param = 106;
@@ -856,6 +857,24 @@ message BinLabelDataParameter {
   optional bool shuffle = 6 [default = false];
 
   optional bool mirror = 7 [default = true];
+
+  optional Slice label_slice = 8;
+  optional Slice bin_slice = 9;
+}
+
+message BinROILabelDataParameter {
+  // Specify the data source.
+  optional string bin_list_path = 1;
+  optional string label_list_path = 2;
+  optional string roi_list_path = 3;
+  // Specify the batch size.
+  optional uint32 batch_size = 4 [default = 1];
+  // Whether or not ImageLayer should shuffle the list of files at every epoch.
+  optional bool shuffle = 5 [default = false];
+
+  optional bool mirror = 6 [default = true];
+
+  optional uint32 resolution = 7 [default = 28];
 
   optional Slice label_slice = 8;
   optional Slice bin_slice = 9;
