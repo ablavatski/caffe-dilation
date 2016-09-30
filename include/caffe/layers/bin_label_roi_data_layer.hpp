@@ -1,5 +1,5 @@
-#ifndef CAFFE_BIN_ROI_LABEL_DATA_LAYER_H
-#define CAFFE_BIN_ROI_LABEL_DATA_LAYER_H
+#ifndef CAFFE_BIN_LABEL_ROI_DATA_LAYER_H
+#define CAFFE_BIN_LABEL_ROI_DATA_LAYER_H
 
 #include <vector>
 
@@ -12,17 +12,17 @@
 namespace caffe {
 
 template<typename Dtype>
-class BinROILabelDataLayer : public BasePrefetchingDataLayer<Dtype> {
+class BinLabelROIDataLayer : public BasePrefetchingDataLayer<Dtype> {
  public:
-  explicit BinROILabelDataLayer(const LayerParameter &param)
+  explicit BinLabelROIDataLayer(const LayerParameter &param)
       : BasePrefetchingDataLayer<Dtype>(param) { }
 
-  virtual ~BinROILabelDataLayer();
+  virtual ~BinLabelROIDataLayer();
 
   virtual void DataLayerSetUp(const vector<Blob<Dtype> *> &bottom,
                               const vector<Blob<Dtype> *> &top);
 
-  virtual inline const char *type() const { return "BinROILabelData"; }
+  virtual inline const char *type() const { return "BinLabelROIData"; }
 
   virtual inline int ExactNumBottomBlobs() const { return 0; }
 
@@ -42,13 +42,14 @@ class BinROILabelDataLayer : public BasePrefetchingDataLayer<Dtype> {
   virtual void load_batch(Batch<Dtype> *batch);
 
   std::vector<std::string> bin_names_;
-  std::vector<std::string> roi_names_;
   std::vector<std::string> label_names_;
+  std::vector<std::string> roi_names_;
   int lines_id_;
+  int n_;
 
   shared_ptr<Caffe::RNG> rng_;
 };
 
 } // namespace caffe
 
-#endif //CAFFE_BIN_ROI_LABEL_DATA_LAYER_H
+#endif //CAFFE_BIN_LABEL_ROI_DATA_LAYER_H

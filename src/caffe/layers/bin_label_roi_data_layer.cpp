@@ -9,7 +9,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-#include "caffe/layers/bin_roi_label_data_layer.hpp"
+#include "caffe/layers/bin_label_roi_data_layer.hpp"
 #include "caffe/layer.hpp"
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/benchmark.hpp"
@@ -352,14 +352,14 @@ void AssignEvenLabelWeight(const Dtype *labels, int num, Dtype *weights) {
 namespace caffe {
 
 template <typename Dtype>
-BinROILabelDataLayer<Dtype>::~BinROILabelDataLayer<Dtype>() {
+BinLabelROIDataLayer<Dtype>::~BinLabelROIDataLayer<Dtype>() {
   this->StopInternalThread();
 }
 
 template <typename Dtype>
-void BinROILabelDataLayer<Dtype>::DataLayerSetUp(
+void BinLabelROIDataLayer<Dtype>::DataLayerSetUp(
     const vector<Blob<Dtype>*>& bottom, const vector<Blob<Dtype>*>& top) {
-  auto &data_param = this->layer_param_.bin_roi_label_data_param();
+  auto &data_param = this->layer_param_.bin_label_roi_data_param();
 
 // Read the file with filenames and labels
   const string& bin_list_path = data_param.bin_list_path();
@@ -401,6 +401,7 @@ void BinROILabelDataLayer<Dtype>::DataLayerSetUp(
   LOG(INFO) << "A total of " << bin_names_.size() << " images.";
 
   lines_id_ = 0;
+  n_ = 0;
 
   vector<int> data_shape(4);
   // vector<int> bin_shape = ReadImageShape(data_param.bin_dir() + bin_names_[0]);
@@ -447,7 +448,7 @@ void BinROILabelDataLayer<Dtype>::DataLayerSetUp(
 }
 
 template <typename Dtype>
-void BinROILabelDataLayer<Dtype>::ShuffleImages() {
+void BinLabelROIDataLayer<Dtype>::ShuffleImages() {
   caffe::rng_t* prefetch_rng =
       static_cast<caffe::rng_t*>(prefetch_rng_->generator());
   vector<int> order(bin_names_.size());
@@ -470,7 +471,7 @@ void BinROILabelDataLayer<Dtype>::ShuffleImages() {
 
 
 template <typename Dtype>
-int BinROILabelDataLayer<Dtype>::Rand(int n) {
+int BinLabelROIDataLayer<Dtype>::Rand(int n) {
   CHECK(rng_);
   CHECK_GT(n, 0);
   caffe::rng_t* rng =
@@ -481,13 +482,13 @@ int BinROILabelDataLayer<Dtype>::Rand(int n) {
 
 // This function is used to create a thread that prefetches the data.
 template <typename Dtype>
-void BinROILabelDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
+void BinLabelROIDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   CPUTimer batch_timer;
   batch_timer.Start();
   double read_time = 0;
   double trans_time = 0;
   CPUTimer timer;
-  auto &data_param = this->layer_param_.bin_roi_label_data_param();
+  auto &data_param = this->layer_param_.bin_label_roi_data_param();
   const int batch_size = data_param.batch_size();
   caffe::Slice label_slice = data_param.label_slice();
 
@@ -554,30 +555,32 @@ void BinROILabelDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
     CHECK_GT(roi.total(), 0);
     roi.convertTo(roi, CV_32F);
 
-    int n = Rand(label.rows);
-    label = label.row(n);
-    roi = roi.row(n);
+    cv::Mat label_row = label.row(n_);
+    cv::Mat roi_row = roi.row(n_);
     //std::cout << n << std::endl;
 
     if (do_mirror) {
-      MirrorImage<Dtype>(image);
+     // MirrorImage<Dtype>(image);
       // MirrorLabel<Dtype>(label);
       //MirrorROI<Dtype>(label);
     }
 
     cv::Mat out_label(1, label_shape.data() + 1, cv::DataType<Dtype>::type,
                       prefetch_label + label_offset);
-    CHECK_EQ(label.total(), out_label.total());
-    CHECK_EQ(label.type(), out_label.type());
-    label.copyTo(out_label);
-    
+    CHECK_EQ(label_row.total(), out_label.total());
+    CHECK_EQ(label_row.type(), out_label.type());
+    // label_row.copyTo(out_label);
+    for (int c = 0; c < 28; ++c) {
+        out_label.at<float>(0, c) = label_row.at<float>(0, c);
+    }
+
     cv::Mat out_roi(1, roi_shape.data() + 1, cv::DataType<Dtype>::type,
                       prefetch_roi + roi_offset);
     out_roi.at<float>(0, 0) = item_id;
     for (int c = 1; c < 5; ++c) {
-        out_roi.at<float>(0, c) = roi.at<float>(0, c - 1);
+        out_roi.at<float>(0, c) = roi_row.at<float>(0, c - 1);
     }
-    CHECK_EQ(roi.type(), out_roi.type());
+    CHECK_EQ(roi_row.type(), out_roi.type());
 
     cv::Mat out_data(3, data_shape.data() + 1, cv::DataType<Dtype>::type,
                      prefetch_data + image_offset);
@@ -612,7 +615,12 @@ void BinROILabelDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
 
     // prefetch_label[item_id] = lines_[lines_id_].second;
     // go to the next iter
-    lines_id_++;
+    // std::cout << "Lines id: " <<  lines_id_ << " N: " << n_ << std::endl;
+    n_++;
+    if (n_ == label.rows) {
+      n_ = 0;
+      lines_id_++;
+    }
     if (lines_id_ >= lines_size) {
       // We have reached the end. Restart from the first.
       DLOG(INFO) << "Restarting data prefetching from start.";
@@ -628,7 +636,7 @@ void BinROILabelDataLayer<Dtype>::load_batch(Batch<Dtype>* batch) {
   DLOG(INFO) << "Transform time: " << trans_time / 1000 << " ms.";
 }
 
-INSTANTIATE_CLASS(BinROILabelDataLayer);
-REGISTER_LAYER_CLASS(BinROILabelData);
+INSTANTIATE_CLASS(BinLabelROIDataLayer);
+REGISTER_LAYER_CLASS(BinLabelROIData);
 
 }  // namespace caffe
